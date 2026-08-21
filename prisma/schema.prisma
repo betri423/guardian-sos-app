@@ -1,0 +1,53 @@
+// Guardian S.O.S - Prisma Schema (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model License {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  userId      String?
+  deviceName  String?
+  createdAt   DateTime  @default(now())
+  activatedAt DateTime?
+  active      Boolean   @default(true)
+}
+
+model AdminPin {
+  id        String   @id @default(cuid())
+  pin       String   @unique
+  updatedAt DateTime @updatedAt
+}
+
+model AlertState {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  status            String   @default("SAFE")
+  latitude          Float?
+  longitude         Float?
+  accuracy          Float?
+  notificationSteps String   @default("[]")
+  victimName        String   @default("")
+  transcript        String   @default("[]")
+  updatedAt         DateTime @updatedAt
+}
+
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String   // the victim's userId (SOS-XXXXXX) - multiple devices allowed
+  endpoint   String   // unique per browser/device - used as the push target
+  p256dh     String   // client public key (base64url)
+  auth       String   // auth secret (base64url)
+  userAgent  String?  // device hint for debugging
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+}

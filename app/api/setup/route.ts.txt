@@ -1,0 +1,95 @@
+import { NextResponse } from 'next/server'
+import { db } from '@/lib/db'
+
+export async function POST() {
+  try {
+    if (!db) {
+      return NextResponse.json({
+        success: false,
+        message: 'Base de datos no configurada. Agrega DATABASE_URL en Vercel.',
+      }, { status: 503 })
+    }
+
+    try {
+      await db.$executeRaw`
+        CREATE TABLE IF NOT EXISTS "License" (
+          "id" TEXT NOT NULL,
+          "key" TEXT NOT NULL,
+          "userId" TEXT,
+          "deviceName" TEXT,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "activatedAt" TIMESTAMP(3),
+          "active" BOOLEAN NOT NULL DEFAULT true
+        )
+      `
+
+      await db.$executeRaw`
+        CREATE TABLE IF NOT EXISTS "AdminPin" (
+          "id" TEXT NOT NULL,
+          "pin" TEXT NOT NULL,
+          "updatedAt" TIMESTAMP(3) NOT NULL
+        )
+      `
+
+      await db.$executeRaw`
+        CREATE TABLE IF NOT EXISTS "AlertState" (
+          "id" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          "status" TEXT NOT NULL DEFAULT 'SAFE',
+          "latitude" DOUBLE PRECISION,
+          "longitude" DOUBLE PRECISION,
+          "accuracy" DOUBLE PRECISION,
+          "notificationSteps" TEXT DEFAULT '[]',
+          "victimName" TEXT DEFAULT '',
+          "transcript" TEXT DEFAULT '[]',
+          "updatedAt" TIMESTAMP(3) NOT NULL
+        )
+      `
+
+      await db.$executeRaw`
+        CREATE TABLE IF NOT EXISTS "PushSubscription" (
+          "id" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          "endpoint" TEXT NOT NULL,
+          "p256dh" TEXT NOT NULL,
+          "auth" TEXT NOT NULL,
+          "userAgent" TEXT,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL
+        )
+      `
+    } catch (sqlError: any) {
+      console.error('[setup] SQL Error:', sqlError.message)
+    }
+
+    let pinRecord = null
+    try {
+      pinRecord = await db.adminPin.findFirst()
+    } catch (e: any) {}
+
+    if (!pinRecord) {
+      try {
+        pinRecord = await db.adminPin.create({
+          data: { pin: '9988' },
+        })
+      } catch (e: any) {
+        return NextResponse.json({
+          success: false,
+          message: 'Error al crear PIN: ' + e.message,
+        }, { status: 500 })
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Base de datos inicializada correctamente.',
+      pinCreated: pinRecord?.pin === '9988',
+      currentPin: pinRecord?.pin || '9988',
+    })
+  } catch (error: any) {
+    return NextResponse.json({
+      success: false,
+      message: 'Error al inicializar: ' + error.message,
+    }, { status: 500 })
+  }
+}
